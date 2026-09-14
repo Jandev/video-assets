@@ -1,0 +1,38 @@
+name: Verify demos
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: Verify Bicep and scripts
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Install Bicep CLI
+        run: az bicep install
+
+      - name: Run demo verification
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          found=false
+          while IFS= read -r -d '' verify_script; do
+            found=true
+            echo "::group::${verify_script%/scripts/verify.sh}"
+            "$verify_script"
+            echo "::endgroup::"
+          done < <(find . -mindepth 3 -maxdepth 3 -path '*/scripts/verify.sh' -type f -print0 | sort -z)
+
+          if [[ "$found" != true ]]; then
+            echo "No demo verification scripts were found." >&2
+            exit 1
+          fi
