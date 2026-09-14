@@ -1,0 +1,6 @@
+obj/
+bin/
+.venv/
+node_modules/
+.pytest_cache/
+*.user
