@@ -1,9 +1,5 @@
 # 26 — Action groups that reach someone (a role, not a person)
 
-> A working demo accompanying the video [`docs/script.md`](docs/script.md).
-> Fictional company **Contoso**, domain: widget catalog / orders. Nothing in
-> this folder refers to a real customer, tenant or subscription.
-
 An alert wired to one person's mailbox is a liability the day that person
 changes teams: the rule stays green, the deployment stays healthy, and the page
 goes to a mailbox nobody reads. This demo replaces "email a person" with "notify
@@ -15,7 +11,7 @@ every workload and every alert family reuses.
 - A single, central action group in a **management resource group**, reused by
   every workload resource group and every alert family — not one group per alert.
 - **ARM role receivers** (Owner + Contributor) that reach whoever holds the role
-  *right now*, so on-call routing survives people leaving with no Bicep change.
+  _right now_, so on-call routing survives people leaving with no Bicep change.
 - Three receiver kinds side by side — `armRoleReceivers`, `emailReceivers`,
   `webhookReceivers` — all on the **common alert schema**.
 - The cross-resource-group reuse pattern: `existing` + `scope` to consume an
@@ -53,11 +49,11 @@ flowchart TB
 
 ## Prerequisites
 
-| Tool | Version | Needed for |
-|---|---|---|
-| Azure CLI | 2.60+ | deploying, firing the test notification |
-| Bicep CLI | via `az bicep install` | compiling templates |
-| PowerShell | 7+ | the `.ps1` variants (optional) |
+| Tool       | Version                | Needed for                              |
+| ---------- | ---------------------- | --------------------------------------- |
+| Azure CLI  | 2.60+                  | deploying, firing the test notification |
+| Bicep CLI  | via `az bicep install` | compiling templates                     |
+| PowerShell | 7+                     | the `.ps1` variants (optional)          |
 
 To **deploy** you need rights to create resource groups and a subscription-scope
 budget (Owner, or Contributor plus the budget permissions). The offline checks
@@ -128,7 +124,7 @@ several people share one subscription and need distinct resource-group names.
 
 1. **`action-group.bicep`** — scroll the three receiver blocks. Land on
    `armRoleReceivers`: the two Owner/Contributor GUIDs, and the point that they
-   resolve to *whoever holds the role now*, not a fixed mailbox.
+   resolve to _whoever holds the role now_, not a fixed mailbox.
 2. **The 12-char trap** — show the `@maxLength(12)` on `groupShortName` and say
    why "contoso-demo-26-oncall" (22 chars) would fail the deployment.
 3. **`main.bicep`** — subscription scope, two resource groups, one action group
@@ -169,8 +165,8 @@ The key ideas, in the Bicep:
   ```
 
 - **One name, no drift.** `main.bicep` computes the action group name once and
-  passes it both to the module that *creates* the group and to the module that
-  *looks it up* cross-RG, so the `existing` reference can never go stale:
+  passes it both to the module that _creates_ the group and to the module that
+  _looks it up_ cross-RG, so the `existing` reference can never go stale:
 
   ```bicep
   resource sharedActionGroup 'Microsoft.Insights/actionGroups@2023-01-01' existing = {
