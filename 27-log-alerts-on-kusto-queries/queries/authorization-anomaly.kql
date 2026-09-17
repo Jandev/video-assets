@@ -1,0 +1,9 @@
+// Privacy-safe alert query: returns ONE aggregate count column and nothing else.
+// It deliberately does NOT return client IPs, user or principal ids, tokens,
+// authorization headers, or the requested path. A 401/403 spike is triaged from
+// the count plus server-side identity signals - never from request content,
+// which would copy authentication data into every notification channel.
+AppRequests
+| where TimeGenerated > ago(5m)
+| where AppRoleName =~ 'contoso-widget-api'
+| summarize AuthFailureCount = countif(toint(ResultCode) in (401, 403))

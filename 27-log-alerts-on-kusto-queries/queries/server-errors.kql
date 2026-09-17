@@ -1,0 +1,9 @@
+// Privacy-safe alert query: returns ONE aggregate count column and nothing else.
+// It deliberately does NOT return request paths, query strings, client IPs,
+// user or principal ids, or headers - no per-request row leaves the workspace.
+// Everything a query returns lands in the alert payload, the notification email
+// and any downstream webhook or ticket, so the query returns only a count.
+AppRequests
+| where TimeGenerated > ago(5m)
+| where AppRoleName =~ 'contoso-widget-api'
+| summarize ServerErrorCount = countif(toint(ResultCode) >= 500)

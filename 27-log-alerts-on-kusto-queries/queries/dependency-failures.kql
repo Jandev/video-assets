@@ -1,0 +1,10 @@
+// Privacy-safe alert query: returns ONE aggregate count column and nothing else.
+// It deliberately does NOT return dependency targets, connection strings, SQL
+// text, command parameters, or any data returned by the dependency call. A
+// failed dependency is investigated from the count and a trace id, not from the
+// payload of the failing call.
+AppDependencies
+| where TimeGenerated > ago(5m)
+| where AppRoleName =~ 'contoso-widget-api'
+| where Success == false
+| summarize DependencyFailureCount = count()

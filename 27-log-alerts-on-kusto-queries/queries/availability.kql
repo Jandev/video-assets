@@ -1,0 +1,9 @@
+// Privacy-safe alert query: returns ONE aggregate count column and nothing else.
+// It deliberately does NOT return per-request rows - it exists to detect the
+// ABSENCE of telemetry, the alert people forget to write. When the count drops
+// to zero the app has stopped reporting (crash, bad deploy, broken egress),
+// which is invisible to every rule that only looks for errors.
+AppRequests
+| where TimeGenerated > ago(5m)
+| where AppRoleName =~ 'contoso-widget-api'
+| summarize RequestCount = count()
