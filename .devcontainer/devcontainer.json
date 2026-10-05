@@ -1,0 +1,69 @@
+{
+  "name": "Video Assets - Azure Dev",
+  "build": {
+    "dockerfile": "Dockerfile"
+  },
+  "features": {
+    "ghcr.io/devcontainers/features/common-utils:2": {
+      "username": "vscode",
+      "installZsh": true,
+      "configureZshAsDefaultShell": true,
+      "installOhMyZsh": true,
+      "installOhMyZshConfig": false
+    },
+    "ghcr.io/devcontainers/features/azure-cli:1": {
+      "version": "latest",
+      "installBicep": true,
+      "bicepVersion": "latest"
+    },
+    "ghcr.io/devcontainers/features/github-cli:1": {
+      "version": "latest"
+    },
+    "ghcr.io/devcontainers/features/powershell:2": {
+      "version": "lts"
+    }
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-vscode.azure-account",
+        "ms-azure-tools.vscode-azuretools",
+        "ms-vscode.powershell"
+      ],
+      "settings": {
+        "python.defaultInterpreterPath": "/usr/local/bin/python",
+        "python.linting.enabled": true,
+        "workbench.colorCustomizations": {
+          "titleBar.activeBackground": "#F7941E",
+          "titleBar.activeForeground": "#3A3A3C",
+          "titleBar.inactiveBackground": "#3A3A3C",
+          "titleBar.inactiveForeground": "#F7941E",
+          "activityBar.background": "#3A3A3C",
+          "activityBar.foreground": "#F7941E",
+          "activityBarBadge.background": "#F7941E",
+          "activityBarBadge.foreground": "#3A3A3C"
+        }
+      }
+    }
+  },
+  "mounts": [
+    "source=personal-azure,target=/home/vscode/.azure,type=volume",
+    "source=personal-github,target=/home/vscode/.config/gh,type=volume"
+  ],
+  "postCreateCommand": "sudo chown -R vscode:vscode /home/vscode/.azure /home/vscode/.config/gh && az version && az bicep version && gh --version && pwsh --version && (az account show --query \"user.name\" --output tsv 2>/dev/null || echo \"Azure CLI: not authenticated\") && (gh auth status || echo \"GitHub CLI: not authenticated\")",
+  "remoteUser": "vscode",
+  "forwardPorts": [
+    8080,
+    3000
+  ],
+  "portsAttributes": {
+    "8080": {
+      "label": "Application",
+      "onAutoForward": "notify"
+    },
+    "3000": {
+      "label": "Dev Server",
+      "onAutoForward": "notify"
+    }
+  }
+}
