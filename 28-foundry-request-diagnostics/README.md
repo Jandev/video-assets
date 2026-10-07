@@ -1,4 +1,4 @@
-# 28 - Troubleshoot Microsoft Foundry requests with headers and traces
+# 28 - Troubleshoot Microsoft Foundry response headers and traces
 
 When a model call is slow or fails, "the agent was slow" is not enough for a
 useful support case. This demo produces the evidence that lets you separate
@@ -9,25 +9,24 @@ It contains two deliberately small applications over one shared deployment:
 
 1. **Direct OpenAI SDK** - the transparent baseline, based on the reproduction
    from [Responses with Microsoft Foundry models are very slow](https://jan-v.nl/post/2026/responses-with-microsoft-foundry-models-are-very-slow/).
-2. **Microsoft Agent Framework (MAF)** - the same request, correlation header,
-   wire output and streaming switch, with MAF's agent-level OpenTelemetry spans.
+2. **Microsoft Agent Framework (MAF)** - the same request, wire output and
+   streaming switch, with MAF's agent-level OpenTelemetry spans.
 
 Both apps print a redacted HTTP transcript. Authentication headers never appear
 in the output.
 
 ## What this demonstrates
 
-- Add a caller-owned `x-ms-client-request-id` UUID to every model call.
 - Capture the service-owned `apim-request-id` / `x-request-id` returned by
   Foundry. These are the identifiers Azure Support can use to find the call.
 - Capture processing, streaming, model, region, cluster, tier and rate-limit
   response headers instead of guessing at the cause.
-- Compare the exact request with the correlation header absent and present.
 - Compare `stream=true` and `stream=false` without changing the prompt.
 - Emit a complete client-side trace to the Application Insights resource linked
   to the Foundry project, and print its 32-character trace ID.
-- See the important boundary: HTTP request IDs help Microsoft investigate the
-  managed service; OpenTelemetry trace IDs help you investigate your app/agent.
+- See the boundary between Foundry request IDs, which help Microsoft investigate
+   the managed service, and OpenTelemetry trace IDs, which help you investigate
+   your app/agent.
 
 ## Architecture
 
@@ -51,8 +50,8 @@ flowchart LR
         AI --> LAW
     end
 
-    OAI -->|"Responses API + x-ms-client-request-id"| PROJECT
-    MAF -->|"Responses API + x-ms-client-request-id"| PROJECT
+   OAI -->|"Responses API"| PROJECT
+   MAF -->|"Responses API"| PROJECT
     OTEL -->|"spans + trace ID"| AI
 ```
 
@@ -61,27 +60,26 @@ flowchart LR
 | `infra/main.bicep` | Orchestrates Foundry and monitoring modules |
 | `infra/modules/foundry.bicep` | Account, project, model deployment, App Insights connection and Azure AI User role |
 | `infra/modules/monitoring.bicep` | Log Analytics, Application Insights and trace-reader role |
-| `src/diagnostics.py` | Correlation IDs, safe wire recorder, response-header allowlist and tracing setup |
+| `src/diagnostics.py` | Safe wire recorder, response-header allowlist and tracing setup |
 | `src/openai_headers.py` | Direct OpenAI SDK baseline |
-| `src/maf_headers.py` | MAF `Agent` flow using per-call `extra_headers` |
+| `src/maf_headers.py` | MAF `Agent` flow |
 
-## The headers to keep
+## Foundry response headers
 
-There is only one header this demo asks the application to create. The other
-values are returned by the service and must be logged alongside it.
+The demo prints the following service-owned response headers when Foundry
+returns them.
 
-| Direction | Header | Why it matters |
-| --- | --- | --- |
-| Request | `x-ms-client-request-id` | Your UUID. It connects application logs, the HTTP exchange and a support ticket even if the request fails before a response ID is returned. Generate a new value per model request. |
-| Response | `apim-request-id` | Foundry gateway request ID documented for troubleshooting. This is the first ID to include in a support case. |
-| Response | `x-request-id` | Backend request ID. Preserve it when present. |
-| Response | `openai-processing-ms` | Service-side processing time. Compare it with client wall clock to locate network/SDK overhead. |
-| Response | `azureai-fe-is-streaming` | How the Foundry front end classified the request. |
-| Response | `x-ms-served-model` | Actual model/version that served the deployment alias. |
-| Response | `x-ms-region` | Serving region. |
-| Response | `azureml-served-by-cluster` | Backend cluster, when exposed. Useful for repeated cluster-specific failures. |
-| Response | `azureai-fe-requested-service-tier` | Requested/selected service tier, when exposed. |
-| Response | `x-ratelimit-*` | Remaining and limit values for request/token quota. These help distinguish throttling from latency. |
+| Header | Why it matters |
+| --- | --- |
+| `apim-request-id` | Foundry gateway request ID documented for troubleshooting. This is the first ID to include in a support case. |
+| `x-request-id` | Backend request ID. Preserve it when present. |
+| `openai-processing-ms` | Service-side processing time. Compare it with client wall clock to locate network/SDK overhead. |
+| `azureai-fe-is-streaming` | How the Foundry front end classified the request. |
+| `x-ms-served-model` | Actual model/version that served the deployment alias. |
+| `x-ms-region` | Serving region. |
+| `azureml-served-by-cluster` | Backend cluster, when exposed. Useful for repeated cluster-specific failures. |
+| `azureai-fe-requested-service-tier` | Requested/selected service tier, when exposed. |
+| `x-ratelimit-*` | Remaining and limit values for request/token quota. These help distinguish throttling from latency. |
 
 `traceparent` is a separate concern. OpenTelemetry creates and propagates it to
 correlate spans. Do not replace the HTTP request IDs with the trace ID; record
@@ -96,10 +94,7 @@ both because they answer different questions.
 - Available Global Standard quota for `gpt-4.1-mini` in the selected location
 - PowerShell 7 only if you prefer the `.ps1` scripts
 
-Package versions are pinned in `requirements.txt`. In particular, the MAF demo
-uses `agent.run(..., client_kwargs={"extra_headers": ...})`, which reaches the
-underlying Responses API call in the pinned version. The on-screen wire output
-is the proof: if the header is not visible there, it was not sent.
+Package versions are pinned in `requirements.txt`.
 
 ## Verify before recording
 
@@ -143,8 +138,7 @@ PowerShell: `./scripts/whatif.ps1` and `./scripts/deploy.ps1`.
 
 ## Run the direct OpenAI baseline
 
-The default run makes two streamed calls: first without the correlation header,
-then with it. `--wire` is on by default.
+The default run makes one streamed call. `--wire` is on by default.
 
 ```bash
 ./scripts/run.sh openai
@@ -153,20 +147,16 @@ then with it. `--wire` is on by default.
 Useful recording variations:
 
 ```bash
-# One request with the recommended header
-./scripts/run.sh openai --headers with
-
 # Reproduce the buffered Responses API path from the blog post
-./scripts/run.sh openai --headers with --no-stream
+./scripts/run.sh openai --no-stream
 
 # Keep the concise summary but hide the full HTTP request
-./scripts/run.sh openai --headers both --no-wire
+./scripts/run.sh openai --no-wire
 ```
 
 For every call, point out these three lines first:
 
 ```text
-x-ms-client-request-id: <your UUID>
 apim-request-id: <Foundry request ID>
 openai-processing-ms: <service time>
 ```
@@ -181,20 +171,11 @@ the service path.
 ./scripts/run.sh maf
 ```
 
-The important MAF call is intentionally visible in `src/maf_headers.py`:
-
-```python
-response = await agent.run(
-    prompt,
-    client_kwargs={"extra_headers": {"x-ms-client-request-id": request_id}},
-)
-```
-
 Use the same switches as the OpenAI demo:
 
 ```bash
-./scripts/run.sh maf --headers with --stream
-./scripts/run.sh maf --headers with --no-stream
+./scripts/run.sh maf --stream
+./scripts/run.sh maf --no-stream
 ```
 
 MAF natively emits GenAI spans when an OpenTelemetry provider is configured.
@@ -236,7 +217,6 @@ the OpenTelemetry trace:
 
 - UTC timestamp and timezone
 - Foundry account/project and model deployment
-- `x-ms-client-request-id`
 - `apim-request-id` and `x-request-id`
 - `openai-processing-ms` and client wall-clock time
 - streaming flag, status code, region, cluster and rate-limit headers
@@ -264,4 +244,3 @@ billable. Delete the resource group after recording.
 - [Set up tracing for AI agents in Microsoft Foundry](https://learn.microsoft.com/azure/foundry/observability/how-to/trace-agent-setup)
 - [Microsoft Agent Framework observability samples](https://github.com/microsoft/agent-framework/tree/main/python/samples/02-agents/observability)
 - [Foundry Responses REST reference](https://learn.microsoft.com/rest/api/aifoundry/azureopenai/responses)
-- [Foundry REST troubleshooting correlation header](https://learn.microsoft.com/azure/ai-services/reference/rest-api-resources)

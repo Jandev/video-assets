@@ -18,7 +18,6 @@ from opentelemetry import trace
 from diagnostics import (
     HttpExchangeRecorder,
     configure_tracing,
-    correlation_headers,
     print_diagnostic_summary,
     print_trace_id,
 )
@@ -29,7 +28,6 @@ TOKEN_SCOPE = "https://ai.azure.com/.default"
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--headers", choices=("with", "without", "both"), default="both")
     parser.add_argument("--stream", action=argparse.BooleanOptionalAction, default=True)
     parser.add_argument("--wire", action=argparse.BooleanOptionalAction, default=True)
     return parser.parse_args()
@@ -51,13 +49,11 @@ async def invoke(
     endpoint: str,
     model: str,
     credential: DefaultAzureCredential,
-    include_headers: bool,
     stream: bool,
     wire: bool,
     tracer: Any,
 ) -> None:
     recorder = HttpExchangeRecorder(print_wire=wire)
-    headers = correlation_headers(include_headers)
     token_provider = get_bearer_token_provider(credential, TOKEN_SCOPE)
 
     async with recorder.create_http_client() as http_client:
@@ -75,20 +71,16 @@ async def invoke(
             instructions="Be concise and follow the requested output format exactly.",
         )
 
-        label = f"Microsoft Agent Framework | headers={'on' if include_headers else 'off'} | stream={stream}"
+        label = f"Microsoft Agent Framework | stream={stream}"
         with tracer.start_as_current_span("demo28.maf.invoke") as span:
             print_trace_id(span)
-            span.set_attribute("demo.request_headers_enabled", include_headers)
             span.set_attribute("gen_ai.request.model", model)
-            if headers:
-                span.set_attribute("foundry.request.x-ms-client-request-id", headers["x-ms-client-request-id"])
             started = time.monotonic()
             if stream:
                 parts: list[str] = []
                 response_stream = agent.run(
                     PROMPT,
                     stream=True,
-                    client_kwargs={"extra_headers": headers},
                 )
                 async for update in response_stream:
                     if update.text:
@@ -97,7 +89,6 @@ async def invoke(
             else:
                 response = await agent.run(
                     PROMPT,
-                    client_kwargs={"extra_headers": headers},
                 )
                 answer = response.text
             elapsed_ms = (time.monotonic() - started) * 1000
@@ -108,7 +99,6 @@ async def invoke(
 
         print_diagnostic_summary(
             label=label,
-            request_headers=recorder.last_request_headers,
             response_headers=recorder.last_response_headers,
             status_code=recorder.last_status_code,
             elapsed_ms=elapsed_ms,
@@ -126,18 +116,15 @@ async def main() -> None:
     args = parse_args()
     endpoint, model = required_environment()
     tracer = configure_tracing("demo28-maf")
-    states = [False, True] if args.headers == "both" else [args.headers == "with"]
     async with DefaultAzureCredential() as credential:
-        for include_headers in states:
-            await invoke(
-                endpoint=endpoint,
-                model=model,
-                credential=credential,
-                include_headers=include_headers,
-                stream=args.stream,
-                wire=args.wire,
-                tracer=tracer,
-            )
+        await invoke(
+            endpoint=endpoint,
+            model=model,
+            credential=credential,
+            stream=args.stream,
+            wire=args.wire,
+            tracer=tracer,
+        )
 
 
 if __name__ == "__main__":

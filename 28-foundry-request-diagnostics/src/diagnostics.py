@@ -6,14 +6,11 @@ import json
 import os
 from collections.abc import Mapping
 from typing import Any
-from uuid import uuid4
 
 from azure.monitor.opentelemetry import configure_azure_monitor
 from openai import DefaultAsyncHttpxClient
 from opentelemetry import trace
 from opentelemetry.sdk.resources import Resource
-
-REQUEST_HEADER = "x-ms-client-request-id"
 
 RESPONSE_HEADERS = {
     "apim-request-id",
@@ -21,7 +18,6 @@ RESPONSE_HEADERS = {
     "azureai-fe-requested-service-tier",
     "azureml-served-by-cluster",
     "openai-processing-ms",
-    "x-ms-client-request-id",
     "x-ms-region",
     "x-ms-served-model",
     "x-ratelimit-limit-requests",
@@ -32,11 +28,6 @@ RESPONSE_HEADERS = {
 }
 
 SECRET_HEADERS = {"api-key", "authorization", "cookie", "set-cookie"}
-
-
-def correlation_headers(enabled: bool) -> dict[str, str]:
-    """Return a fresh caller-owned identifier, or no extra headers."""
-    return {REQUEST_HEADER: str(uuid4())} if enabled else {}
 
 
 def selected_response_headers(headers: Mapping[str, str]) -> dict[str, str]:
@@ -129,7 +120,6 @@ def print_trace_id(span: Any) -> None:
 def print_diagnostic_summary(
     *,
     label: str,
-    request_headers: Mapping[str, str],
     response_headers: Mapping[str, str],
     status_code: int | None,
     elapsed_ms: float,
@@ -138,8 +128,6 @@ def print_diagnostic_summary(
     print(f"\n=== {label} ===")
     print(f"HTTP status: {status_code if status_code is not None else '<not captured>'}")
     print(f"Client wall clock: {elapsed_ms:,.0f} ms")
-    print("Request correlation:")
-    print(f"  {REQUEST_HEADER}: {request_headers.get(REQUEST_HEADER, '<not sent>')}")
     print("Foundry response headers:")
     if selected:
         for key, value in sorted(selected.items()):

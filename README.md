@@ -10,7 +10,7 @@ instructions and context needed to explore it independently.
 | --- | --- |
 | [26 — Action groups that reach someone](26-action-groups-that-reach-someone/) | A runnable Azure Bicep demo showing one shared action group, role-based receivers, cross-resource-group reuse, resource health alerts, a cost budget, and a metric alert. |
 | [27 — Privacy-safe log alerts](27-log-alerts-on-kusto-queries/) | Four runnable KQL log alerts that aggregate telemetry without copying customer request data into notifications. |
-| [28 — Foundry request diagnostics](28-foundry-request-diagnostics/) | Deploy Foundry plus a model and trace store, then compare OpenAI SDK and Microsoft Agent Framework calls with correlation headers, response diagnostics and end-to-end traces. |
+| [28 — Foundry request diagnostics](28-foundry-request-diagnostics/) | Deploy Foundry plus a model and trace store, then compare OpenAI SDK and Microsoft Agent Framework response diagnostics and end-to-end traces. |
 
 Start with the README inside a demo directory for prerequisites, architecture,
 deployment instructions, verification, and cleanup steps.
